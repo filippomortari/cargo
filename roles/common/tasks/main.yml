@@ -1,0 +1,78 @@
+---
+
+- include_vars: main.yml
+
+
+- name: Change root password
+  user: name=root
+        password={{ UBUNTU_COMMON_ROOT_PASSWORD | password_hash('sha512', PASS_SALT) }}
+
+- name: Add deploy user
+  user: name={{ ubuntu_common_deploy_user_name }}
+        password={{ UBUNTU_COMMON_DEPLOY_PASSWORD | password_hash('sha512', PASS_SALT) }}
+        shell=/bin/bash
+
+- name: Add authorized keys for deploy user
+  authorized_key: user={{ ubuntu_common_deploy_user_name }} key="{{ lookup('file', item) }}"
+  with_items:
+    - ~/.ssh/id_rsa.pub
+
+- name: Add deploy user to sudoers
+  lineinfile: dest=/etc/sudoers
+              regexp="{{ ubuntu_common_deploy_user_name }} ALL"
+              line="{{ ubuntu_common_deploy_user_name }} ALL=(ALL) ALL"
+              state=present
+
+- name: Update all packages
+  apt: upgrade=dist update_cache=yes
+  notify: reboot if required
+
+- name: Install required packages
+  apt: state=installed pkg={{ item }}
+  with_items:
+    - ufw
+    - fail2ban
+    - unattended-upgrades
+
+- name: Install optional packages
+  apt: state=installed pkg={{ item }}
+  with_items:
+    - vim
+
+- name: Configure unattended upgrades
+  copy: src=10periodic dest=/etc/apt/apt.conf.d/10periodic
+
+- name: Setup ufw
+  ufw: state=enabled policy=deny
+
+- name: Allow ssh
+  ufw: rule=allow port=22 proto=tcp
+
+- name: Allow www
+  ufw: rule=allow port=80 proto=tcp
+
+- name: Allow secure www
+  ufw: rule=allow port=443 proto=tcp
+
+- name: Disallow password authentication
+  lineinfile: dest=/etc/ssh/sshd_config
+              regexp="^PasswordAuthentication"
+              line="PasswordAuthentication no"
+              state=present
+  notify: restart ssh
+
+# - name: Disallow root SSH access
+#   lineinfile: dest=/etc/ssh/sshd_config
+#               regexp="^PermitRootLogin"
+#               line="PermitRootLogin no"
+#               state=present
+#   notify: restart ssh
+
+- name: Enable auto reboot when required
+  lineinfile: dest=/etc/apt/apt.conf.d/50unattended-upgrades regexp='^(//)?Unattended-Upgrade::Automatic-Reboot ' line='Unattended-Upgrade::Automatic-Reboot "true";'
+
+- name: Set auto reboot time
+  lineinfile: dest=/etc/apt/apt.conf.d/50unattended-upgrades regexp='^(//)?Unattended-Upgrade::Automatic-Reboot-Time ' line='Unattended-Upgrade::Automatic-Reboot-Time "02:00";'
+
+- name: Enable normal updates
+  lineinfile: dest=/etc/apt/apt.conf.d/50unattended-upgrades regexp='^(//)?\s*"\${distro_id}:\${distro_codename}-updates";' line='{{'\t'}}"${distro_id}:${distro_codename}-updates";'
