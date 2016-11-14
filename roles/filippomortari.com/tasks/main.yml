@@ -1,0 +1,39 @@
+---
+
+- include_vars: main.yml
+
+- name: install git
+  apt: pkg=git state=installed
+
+- name: checkout repo
+  git: repo=git@bitbucket.org:filippomortari/filippomortari.com.git
+       dest=~/git/filippomortari.com
+       version=origin/master
+       accept_hostkey=yes
+  notify: reload nginx
+
+- name: create web root
+  file: path=/usr/share/nginx/html/{{ server_name }} state=directory
+
+- name: copy files to web root
+  command: rsync -a --delete --exclude='.*' ~/git/filippomortari.com/ /usr/share/nginx/html/{{ server_name }}/
+  changed_when: False
+
+- name: upload ssl cert bundle
+  copy: src=files/nginx.crt dest={{ cert_file }} mode=0600
+  notify: reload nginx
+
+# - name: decrypt ssl private key
+#   include_vars: ssl_private_key.yml
+
+- name: upload ssl private key
+  copy: src=files/nginx.key dest={{ key_file }} mode=0600
+  notify: reload nginx
+
+- name: configure nginx
+  template: src=templates/nginx.conf dest=/etc/nginx/sites-available/{{ server_name }}
+  notify: reload nginx
+
+- name: enable nginx site
+  file: src=/etc/nginx/sites-available/{{ server_name }} dest=/etc/nginx/sites-enabled/{{ server_name }} state=link
+  notify: reload nginx
