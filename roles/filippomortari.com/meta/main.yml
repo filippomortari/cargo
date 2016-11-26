@@ -2,4 +2,10 @@
 
 dependencies:
   - { role: common }
+  - { role: thefinn93.letsencrypt,
+       letsencrypt_webroot_path: /usr/share/nginx/html/,
+       letsencrypt_email: filippo.mortari@gmail.com,
+       letsencrypt_cert_domains: [ filippomortari.com, www.filippomortari.com ],
+       letsencrypt_renewal_command_args: '--renew-hook "service nginx reload"'
+     }
   - { role: nginx }

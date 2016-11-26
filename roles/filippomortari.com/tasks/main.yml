@@ -19,17 +19,6 @@
   command: rsync -a --delete --exclude='.*' ~/git/filippomortari.com/ /usr/share/nginx/html/{{ server_name }}/
   changed_when: False
 
-- name: upload ssl cert bundle
-  copy: src=files/nginx.crt dest={{ cert_file }} mode=0600
-  notify: reload nginx
-
-# - name: decrypt ssl private key
-#   include_vars: ssl_private_key.yml
-
-- name: upload ssl private key
-  copy: src=files/nginx.key dest={{ key_file }} mode=0600
-  notify: reload nginx
-
 - name: configure nginx
   template: src=templates/nginx.conf dest=/etc/nginx/sites-available/{{ server_name }}
   notify: reload nginx
